@@ -1,0 +1,18 @@
+Dwell-time model comparison (MLE)
+n = 3122
+------------------------------------------------------------
+  Wald (Inv-Gauss)      LL=  -8219.4216  AIC=  16442.84  BIC=  16454.94  params={'mu': np.float64(9.945172104827186), 'lam': np.float64(69.79160209764838), 'v (drift)': np.float64(0.10055130162248475), 'D (diffusion)': np.float64(0.007164185732553164), 'L (threshold)': 1.0}
+      95% CI mu: (9.805, 10.1)
+      95% CI lam: (66.88, 72.75)
+  Lognormal             LL=  -8225.3038  AIC=  16454.61  BIC=  16466.70  params={'s': np.float64(0.36469812517528766), 'scale': np.float64(9.247688681399124)}
+      95% CI s: (0.3564, 0.3733)
+      95% CI scale: (9.139, 9.357)
+  Gamma                 LL=  -8402.0384  AIC=  16808.08  BIC=  16820.17  params={'shape': np.float64(7.0388433255841685), 'scale': np.float64(1.4128964200272034)}
+      95% CI shape: (6.724, 7.429)
+      95% CI scale: (1.318, 1.488)
+  Weibull               LL=  -8782.3240  AIC=  17568.65  BIC=  17580.74  params={'shape': np.float64(2.4046814432876014), 'scale': np.float64(11.225624036789782)}
+      95% CI shape: (2.304, 2.491)
+      95% CI scale: (11.07, 11.39)
+
+Best AIC: Wald (Inv-Gauss)
+Best BIC: Wald (Inv-Gauss)

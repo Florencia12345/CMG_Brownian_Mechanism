@@ -29,8 +29,24 @@ except Exception:
     scipy_stats = None
 
 # VIVIAN_DIR = Path("./sim_traces")
-# # PLOT_DIR = VIVIAN_DIR / "dwell_time_plots"
+# PLOT_DIR = VIVIAN_DIR / "dwell_time_plots"
 # PLOT_DIR.mkdir(parents=True, exist_ok=True)
+VIVIAN_DIR = Path("/Users/vivian/Desktop/Undergrad Study/Part C Project/code/vivian/")
+PLOT_DIR = VIVIAN_DIR / "dwell_time_plots"
+
+plt.style.use("seaborn-v0_8-whitegrid")
+plt.rcParams.update(
+    {
+        "figure.figsize": (6.5, 4.0),
+        "font.size": 9,
+        "axes.titlesize": 11,
+        "axes.labelsize": 10,
+        "legend.fontsize": 9,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "lines.linewidth": 1,
+    }
+)
 
 
 def parse_file_like_original(path):
@@ -233,7 +249,7 @@ def _moving_mean(arr, kernel):
 def denoiszation(x, y, headers, filepath, 
             interpolate_nans=True,
             median_kernel=3,
-            savgol_window=10,
+            savgol_window=150,
             savgol_polyorder=2,
             aggressive_guard=True,
             aggressive_thresh_mult=19.0,
@@ -466,15 +482,31 @@ def plot_dwell_time_survival(dwell_times, filepath, show=False):
     median_dt = float(np.median(dwell_times))
     std_dt = float(np.std(dwell_times))
 
+    dot_color = "#5B6498"
+    cmap = plt.get_cmap("tab20c")
+    col_model = cmap(0)
+
     fig, ax = plt.subplots(figsize=(7, 5))
-    ax.semilogy(sorted_dt, survival, "o", color="#2e86ab", markersize=4, linewidth=1.5, label="Empirical survival")
+    ax.semilogy(
+        sorted_dt,
+        survival,
+        "o",
+        markersize=4,
+        markerfacecolor="none",
+        markeredgecolor=dot_color,
+        linewidth=0.6,
+        label="Empirical survival",
+    )
     if np.isfinite(se_slope) and se_slope > 0 and slope != 0 and lambda_lo > 0 and lambda_hi > 0:
-        ax.fill_between(t_fit, np.minimum(s_lo, s_hi), np.maximum(s_lo, s_hi), color="#e94f37", alpha=0.2, label="95% CI (fit)")
-    ax.semilogy(t_fit, survival_exp, "--", color="#e94f37", linewidth=2, label=f"Exponential  (τ = {tau_fit:.3g})")
-    ax.set_xlabel("Dwell time Δt", fontsize=12)
-    ax.set_ylabel("Survival 1 − CDF", fontsize=12)
-    ax.set_title("Dwell-time survival (log y)", fontsize=13)
-    ax.legend(loc="upper right", fontsize=9)
+        ax.fill_between(t_fit, np.minimum(s_lo, s_hi), np.maximum(s_lo, s_hi), color=col_model, alpha=0.12, label="95% CI (fit)")
+    ax.semilogy(t_fit, survival_exp, "-", color=col_model, linewidth=1.2, label=f"Exponential  (τ = {tau_fit:.3g})")
+    ax.set_xlabel("Dwell time Δt", fontsize=10)
+    ax.set_ylabel("Survival 1 − CDF", fontsize=10)
+    ax.set_title("Dwell-time survival (log y)", fontsize=11)
+    leg = ax.legend(loc="upper right", fontsize=8, frameon=True)
+    if leg is not None:
+        leg.get_frame().set_edgecolor("0.7")
+        leg.get_frame().set_linewidth(0.7)
 
     # On-graph annotation: dwell time τ ± SE, R², fit quality
     text_lines = [
@@ -484,11 +516,14 @@ def plot_dwell_time_survival(dwell_times, filepath, show=False):
     if np.isfinite(ks_pval):
         text_lines.append(f"KS p = {ks_pval:.3f}")
     text = "\n".join(text_lines)
-    ax.text(0.05, 0.35, text, transform=ax.transAxes, fontsize=10, verticalalignment="top",
+    ax.text(0.05, 0.35, text, transform=ax.transAxes, fontsize=9, verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8), family="monospace")
 
-    ax.grid(True, which="major", alpha=0.4)
-    ax.grid(True, which="minor", alpha=0.2, linestyle=":")
+    ax.grid(True, which="major", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+    ax.grid(True, which="minor", alpha=0.15, linestyle=":", linewidth=0.3, color="0.8")
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.7)
+        spine.set_edgecolor("black")
     ax.set_ylim(bottom=min(0.5 / (n + 1), float(survival.min()) * 0.5))
     fig.tight_layout()
 
@@ -553,28 +588,46 @@ def plot_first_passage_density(dwell_times, filepath, show=False, n_bins=80):
         print("No non-empty bins for first-passage density plot.")
         return
 
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.loglog(bin_centers, hist, "o", color="#2e86ab", markersize=3.5, linewidth=1.5, label="Empirical density")
+    dot_color = "#5B6498"
+    cmap = plt.get_cmap("tab20c")
+    model_colors = [cmap(0), cmap(6), cmap(10), cmap(5)]
 
-    # Overlay MLE fits (same models as plot_dwell_time_fits)
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.loglog(
+        bin_centers,
+        hist,
+        "o",
+        markersize=3.5,
+        markerfacecolor="none",
+        markeredgecolor=dot_color,
+        linewidth=0.6,
+        label="Empirical density",
+    )
+
+    # Overlay MLE fits (same models as plot_dwell_time_fits), styled with tab20c
     models = _fit_dwell_time_models(dwell_times, n_bootstrap=0)
     t_plot = np.linspace(t_min, t_max, 300)
-    colors = ["#2e86ab", "#44af69", "#8b5cf6", "#f59e0b"]
     for i, m in enumerate(models):
-        c = colors[i % len(colors)]
+        c = model_colors[i % len(model_colors)]
         try:
             pdf_vals = m["dist"].pdf(t_plot)
             pdf_vals = np.clip(pdf_vals, 1e-20, None)
-            ax.loglog(t_plot[:200], pdf_vals[:200], "-", color=c, linewidth=1.5, label=m["name"])
+            ax.loglog(t_plot[:200], pdf_vals[:200], "-", color=c, linewidth=1.2, label=m["name"])
         except Exception:
             pass
 
-    ax.set_xlabel("Passage time Δt", fontsize=12)
-    ax.set_ylabel("First-passage density p(Δt)", fontsize=12)
-    ax.set_title("First-passage time probability density", fontsize=13)
-    ax.legend(loc="upper right", fontsize=9)
-    ax.grid(True, which="major", alpha=0.4)
-    ax.grid(True, which="minor", alpha=0.2, linestyle=":")
+    ax.set_xlabel("Passage time Δt", fontsize=10)
+    ax.set_ylabel("First-passage density p(Δt)", fontsize=10)
+    ax.set_title("First-passage time probability density", fontsize=11)
+    leg = ax.legend(loc="upper right", fontsize=8, frameon=True)
+    if leg is not None:
+        leg.get_frame().set_edgecolor("0.7")
+        leg.get_frame().set_linewidth(0.7)
+    ax.grid(True, which="major", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+    ax.grid(True, which="minor", alpha=0.15, linestyle=":", linewidth=0.3, color="0.8")
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.7)
+        spine.set_edgecolor("black")
     fig.tight_layout()
 
     try:
@@ -1035,42 +1088,76 @@ def plot_dwell_time_fits(
             s_lo = np.exp(-lambda_lo * t_fit + intercept)
             s_hi = np.exp(-lambda_hi * t_fit + intercept)
 
-    colors = ["#2e86ab", "#44af69", "#8b5cf6", "#f59e0b"]
-    fig, (ax_surv, ax_fp) = plt.subplots(1,2, figsize=(18, 5), gridspec_kw={"width_ratios": [1, 1]})
+    # Match style and colors with plot_dwell_fit_with_params
+    dot_color = "#5B6498"
+    cmap = plt.get_cmap("tab20c")
+    col_model = cmap(0)
+    col_g = cmap(6)
+    col_sna = cmap(10)
+    col_vsna = cmap(5)
 
-    # Left: survival with linear (exponential) fit + 95% CI (previous version)
-    ax_surv.semilogy(sorted_dt, survival_emp, "o", color="#2e86ab", markersize=4, linewidth=1.5, label="Empirical survival")
-    if np.isfinite(se_slope) and se_slope > 0 and slope != 0 and lambda_lo > 0 and lambda_hi > 0:
-        ax_surv.fill_between(t_fit, np.minimum(s_lo, s_hi), np.maximum(s_lo, s_hi), color="#e94f37", alpha=0.2, label="95% CI (fit)")
-    ax_surv.semilogy(t_fit, survival_exp, "--", color="#e94f37", linewidth=2, label=f"Exponential (τ = {tau_fit:.3g})")
-    ax_surv.set_xlabel("Dwell time Δt", fontsize=12)
-    ax_surv.set_ylabel("Survival 1 − CDF", fontsize=12)
-    ax_surv.set_title("Dwell-time survival (log y)", fontsize=13)
+    fig, (ax_surv, ax_fp) = plt.subplots(
+        1, 2, figsize=(8.0, 3.5), gridspec_kw={"width_ratios": [1.0, 1.4]}
+    )
+
+    # Left: survival with exponential fit (style-matched)
+    ax_surv.scatter(
+        sorted_dt,
+        survival_emp,
+        label="Empirical survival",
+        s=14,
+        facecolors="none",
+        edgecolors=dot_color,
+        linewidths=0.6,
+    )
+    ax_surv.semilogy(t_fit, survival_exp, "-", color=col_model, linewidth=1.2, label=f"Exponential (τ = {tau_fit:.3g})")
+    ax_surv.set_xlabel("Dwell time Δt", fontsize=8)
+    ax_surv.set_ylabel("Survival 1 − CDF", fontsize=8)
+    ax_surv.set_title("Survival vs time", fontsize=9)
     text_lines = [f"τ = {tau_fit:.4g} ± {se_tau:.4g}", f"R² = {r_squared:.4f}" if np.isfinite(r_squared) else "R² = —"]
     ax_surv.text(0.05, 0.35, "\n".join(text_lines), transform=ax_surv.transAxes, fontsize=10, verticalalignment="top",
                  bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8), family="monospace")
-    ax_surv.legend(loc="upper right", fontsize=9)
+    leg_surv = ax_surv.legend(loc="upper right", fontsize=8, frameon=True)
+    if leg_surv is not None:
+        leg_surv.get_frame().set_edgecolor("0.7")
+        leg_surv.get_frame().set_linewidth(0.7)
     ax_surv.set_ylim(bottom=min(0.5 / (n + 1), float(survival_emp.min()) * 0.5))
-    ax_surv.grid(True, which="major", alpha=0.4)
-    ax_surv.grid(True, which="minor", alpha=0.2, linestyle=":")
+    ax_surv.grid(True, which="both", ls="--", alpha=0.2, linewidth=0.4, color="0.7")
+    for spine in ax_surv.spines.values():
+        spine.set_linewidth(0.7)
 
-    # Right: first-passage density (histogram) + all model fits overlaid
-    ax_fp.bar(bin_centers, hist, width=width * 0.9, alpha=0.6, color="#2e86ab", label="Empirical (histogram)", edgecolor="none")
+    # Right: first-passage density (histogram) + best model fits overlaid (style-matched)
+    ax_fp.bar(
+        bin_centers,
+        hist,
+        width=width * 0.9,
+        alpha=0.35,
+        color=dot_color,
+        label="Empirical (histogram)",
+        edgecolor="none",
+    )
+    # Use tab20c colors for model curves in order
+    model_colors = [col_model, col_g, col_sna, col_vsna]
     for i, m in enumerate(models):
-        c = colors[i % len(colors)]
+        c = model_colors[i % len(model_colors)]
         try:
             pdf_vals = m["dist"].pdf(t_plot)
             pdf_vals = np.clip(pdf_vals, 1e-20, None)
-            ax_fp.plot(t_plot, pdf_vals, "-", color=c, linewidth=2, label=m["name"])
+            ax_fp.plot(t_plot, pdf_vals, "-", color=c, linewidth=1.2, label=m["name"])
         except Exception:
             pass
-    ax_fp.set_xlabel("Dwell time t", fontsize=12)
-    ax_fp.set_ylabel("Density f(t)", fontsize=12)
-    ax_fp.set_title("First-passage density: histogram + all model fits", fontsize=13)
-    ax_fp.legend(loc="upper right", fontsize=9)
+    ax_fp.set_xlabel("Dwell time t", fontsize=8)
+    ax_fp.set_ylabel("Density f(t)", fontsize=8)
+    ax_fp.set_title("First-passage density and fits", fontsize=9)
+    leg_fp = ax_fp.legend(loc="upper right", fontsize=8, frameon=True)
+    if leg_fp is not None:
+        leg_fp.get_frame().set_edgecolor("0.7")
+        leg_fp.get_frame().set_linewidth(0.7)
     ax_fp.set_xlim(left=0)
     ax_fp.set_ylim(bottom=0)
-    ax_fp.grid(True, alpha=0.3)
+    ax_fp.grid(True, which="both", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+    for spine in ax_fp.spines.values():
+        spine.set_linewidth(0.7)
     
     # Right: dwell_fits_summary on the plot
     best_aic = min(m["aic"] for m in models)
@@ -1177,7 +1264,7 @@ def dwell_time_analysis(y,
                         filepath,
                         x=None,
                         box_height=None,
-                        num_boxes=140,
+                        num_boxes=None,
                         ymin=None,
                         ymax=None,
                         stable_after_tol=0.0,   # used as a small threshold shift
@@ -1249,7 +1336,8 @@ def dwell_time_analysis(y,
             continue
 
         # Determine which boundaries were crossed in this interval.
-        # We'll record crossings in the natural traversal order.
+        # For dwell-time we ONLY care about first passage to the NEXT UPPER boundary,
+        # so we ignore downward crossings entirely.
         if y1 > y0:
             # upward: boundaries with y0 < b <= y1
             s = np.searchsorted(boundaries, y0 + stable_after_tol, side='right')
@@ -1258,12 +1346,8 @@ def dwell_time_analysis(y,
                 continue
             ks = range(s, e)  # low -> high
         else:
-            # downward: boundaries with y1 < b <= y0
-            s = np.searchsorted(boundaries, y1 + stable_after_tol, side='right')
-            e = np.searchsorted(boundaries, y0 + stable_after_tol, side='right')
-            if s >= e:
-                continue
-            ks = range(e-1, s-1, -1)  # high -> low
+            # ignore downward moves for dwell-time statistics
+            continue
 
         for k in ks:
             level = boundaries[k]
@@ -1271,11 +1355,14 @@ def dwell_time_analysis(y,
             if t_cross is None:
                 t_cross = float(x[i])
 
-            # Keep only the FIRST crossing if we are oscillating on the same boundary
-            if last_k is None or last_k != k:
+            # For dwell times we want FIRST passage to the next *new* upper boundary.
+            # Ignore:
+            #   - repeated crossings of the same boundary (oscillations)
+            #   - crossings of any boundary that is at or below the last one already reached
+            if last_k is None or k > last_k:
                 recorded.append((int(k), float(level), float(t_cross), int(i)))
                 last_k = k
-            # else: ignore repeated k crossings (oscillation)
+            # else: k <= last_k  -> coming back up to a lower or same boundary; ignore
 
     if recorded:
         run_records = np.array(recorded, dtype=float)  # [k, level, t_cross, sample_i]
@@ -1305,39 +1392,69 @@ def dwell_time_analysis(y,
 
     # -------- plotting & saving (kept) --------
     if plot:
-        fig, axes = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={"height_ratios": [2, 1]})
+        # Side-by-side layout: left = crossings, right = dwell-time histogram
+        fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.5), gridspec_kw={"width_ratios": [1.3, 1.0]})
         ax = axes[0]
-        ax.plot(x, y, linewidth=0.8, label="signal")
+        # Slightly thicker trajectory line for clarity
+        ax.plot(x, y, linewidth=0.5, label="Position", color="#5B6498")
 
         if show_boundaries:
             for b in boundaries:
-                ax.axhline(b, color='gray', linewidth=0.6, alpha=0.4)
+                ax.axhline(b, color='gray', linewidth=0.5, alpha=0.4)
 
-        # plot recorded crossings
-        cmap = plt.get_cmap("tab10")
+        # plot recorded crossings using tab10 (consistent with trajectory plots), thinner edges
+        cmap = plt.get_cmap("tab20")
         for rec in run_records:
             k = int(rec[0])
             level = rec[1]
             t_cross = rec[2]
             color = cmap(k % 10)
-            ax.scatter(t_cross, level, s=18, marker='o', facecolor=color, edgecolor='k', zorder=6)
 
-        ax.set_title("First boundary crossings (deduped for oscillations)")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.grid(True)
-        ax.legend(loc="upper left")
+            ax.scatter(
+                t_cross,
+                level,
+                s=8,
+                marker='o',
+                facecolor=color,
+                edgecolor='grey',
+                linewidths=0.5,
+                zorder=6,
+            )
+
+        ax.set_title("First boundary crossings (deduped for oscillations)", fontsize=11)
+        ax.set_xlabel("Time (s)", fontsize=10)
+        ax.set_ylabel("Position", fontsize=10)
+        ax.grid(True, which="both", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+        for spine in ax.spines.values():
+            spine.set_linewidth(0.7)
+            spine.set_edgecolor("black")
+        leg_ax = ax.legend(loc="upper left", fontsize=9, frameon=True)
+        if leg_ax is not None:
+            leg_ax.get_frame().set_edgecolor("0.7")
+            leg_ax.get_frame().set_linewidth(0.7)
 
         ax2 = axes[1]
         if dwell_times.size > 0:
-            ax2.hist(dwell_times, bins=20, alpha=0.8, edgecolor='k')
-            ax2.set_xlabel("Δt between consecutive first crossings")
-            ax2.set_ylabel("Counts")
-            ax2.set_title("Dwell-time histogram (crossing-to-crossing)")
+            # Lighter blue for histogram bins
+            ax2.hist(
+                dwell_times,
+                bins=20,
+                alpha=0.9,
+                edgecolor='black',
+                linewidth=0.5,
+                color="#5B6498",  # light blue
+            )
+            ax2.set_xlabel("Δt between consecutive first crossings (s)", fontsize=10)
+            ax2.set_ylabel("Counts", fontsize=10)
+            ax2.set_title("Dwell-time histogram (crossing-to-crossing)", fontsize=11)
+            ax2.grid(True, which="both", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+            for spine in ax2.spines.values():
+                spine.set_linewidth(0.7)
+                spine.set_edgecolor("black")
         else:
-            ax2.text(0.5, 0.5, "No crossings found", ha='center', va='center')
-            ax2.set_xlabel("Δt")
-            ax2.set_ylabel("Counts")
+            ax2.text(0.5, 0.5, "No crossings found", ha='center', va='center', fontsize=10)
+            ax2.set_xlabel("Δt", fontsize=10)
+            ax2.set_ylabel("Counts", fontsize=10)
 
         plt.tight_layout()
 
@@ -1378,8 +1495,8 @@ def dwell_time_analysis(y,
 
 # -----------------------------------
 
-def plot_one_file(headers, data_cols, filepath, x_slice_start=0, show=True, save=True, crop=False, denoise=False,
-                  dwell_time=False, reference_data_col=None):
+def plot_one_file(headers, data_cols, filepath, x_slice_start=0, show=True, save=True, crop=False, denoise=True,
+                  dwell_time=True, reference_data_col=None):
     """
     Plot using first column as x and the 3rd Y column (index 2) like your snippet.
     If that column doesn't exist, skip plotting.
@@ -1393,8 +1510,10 @@ def plot_one_file(headers, data_cols, filepath, x_slice_start=0, show=True, save
         print(f"File {filepath} doesn't have a third column to plot (has {len(data_cols)} columns). Skipping.")
         return
 
+    print(f"Plotting file: {filepath} with headers: {headers}")
     x = data_cols[0]
     y_target = data_cols[1:]
+    print(f"  Original x length: {len(x)}, y columns count: {len(y_target)}")
         # make sure the two arrays have same length (they should)
     n = min(len(x), len(y_target))
     x = np.array(x)
@@ -1421,38 +1540,67 @@ def plot_one_file(headers, data_cols, filepath, x_slice_start=0, show=True, save
             y = y[:cut]
             print(f" -> Cropped data at index {cut} due to detected noisy tail.")
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(x, y, label=headers[2] if headers and len(headers) > 2 else "col3", linewidth=0.5)
-    plt.xlabel(headers[0] if headers else "X")
-    plt.ylabel("Values")
-    plt.title(f"{Path(filepath).name} — first column as X")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    plt.grid(True)
-    plt.tight_layout()
+    fig, ax = plt.subplots(figsize=(6.5, 4.0))
+    # Use same color theme as other trajectory plots
+    ax.plot(
+        x,
+        y,
+        label=headers[2] if headers and len(headers) > 2 else "Signal",
+        linewidth=0.5,
+        color="#5B6498",
+    )
+    ax.set_xlabel(headers[0] if headers else "Time (s)", fontsize=10)
+    ax.set_ylabel("Position (bp)", fontsize=10)
+    ax.set_title(f"{Path(filepath).name} – trajectory", fontsize=11)
+    leg = ax.legend(loc="upper right", fontsize=9, frameon=True)
+    if leg is not None:
+        leg.get_frame().set_edgecolor("0.7")
+        leg.get_frame().set_linewidth(0.7)
+    ax.grid(True, which="both", alpha=0.2, linestyle="--", linewidth=0.4, color="0.7")
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.7)
+        spine.set_edgecolor("black")
+    fig.tight_layout()
 
     if denoise: 
         y_denoised, info, x_coor = denoiszation(x, y, headers, filepath)
         print(f" Denoising info: {info}")
-        plt.plot(x_coor, y_denoised, color = 'orange', label=headers[2] if headers and len(headers) > 2 else "col3", linewidth= 0.8)
+        print('denoised y length:', len(y_denoised), 'x_coor length:', len(x_coor))
+        print(y_denoised[:10], x_coor[:10])
+        ax.plot(
+            x_coor,
+            y_denoised,
+            label="Denoised",
+            color='tab:orange',
+            linewidth=0.5,
+        )
+        ax.legend(loc="upper right", fontsize=9)
+
         if dwell_time:
-            res = dwell_time_analysis(y_denoised, filepath, x, plot=True)
+            
+            res = dwell_time_analysis(y_denoised, filepath, x, num_boxes=80, plot=True)
             # print("Found crossings:", res['info']['n_crossings_total'])
             # print("Dwell times (count):", len(res['dwell_times']))
             # print("Mean dwell:", np.nanmean(res['dwell_times']) if len(res['dwell_times'])>0 else None)
+            print("Performing dwell time analysis on denoised data...")
     if save:
-        outpath = PLOT_DIR / f"{Path(filepath).stem}.png"
-        plt.savefig(outpath, dpi=200)
+        out_dir = PLOT_DIR if 'PLOT_DIR' in globals() else Path(filepath).parent / "plots"
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        outpath = out_dir / f"{Path(filepath).stem}.png"
+        fig.savefig(outpath, dpi=200, bbox_inches="tight")
         print(f"Saved plot: {outpath}")
     if show:
         plt.show()
 
     else:
-        plt.close()
+        plt.close(fig)
     return res
 # ==================
 
 def main():
-    # VIVIAN_DIR = Path("/Users/vivian/Desktop/Undergrad Study/Part C Project/code/vivian/
+    VIVIAN_DIR = Path("/Users/vivian/Desktop/Undergrad Study/Part C Project/code/vivian/")
+    # PLOT_DIR = VIVIAN_DIR / "dwell_time_plots"
     folders = sorted((VIVIAN_DIR / "data").glob("*"))
     dwell_times_list_all = np.array([], dtype=float) 
     print(folders)
@@ -1481,6 +1629,7 @@ def main():
 
             except Exception as e:
                 print(f"Error processing {tfp}: {e}")
+
         dwell_times_list_all = np.append(dwell_times_list_all, dwell_times_list)
         print(fp)
         # plot_dwell_time_survival(dwell_times_list, "vivian/cmg/Survival_Plots", show=False)
